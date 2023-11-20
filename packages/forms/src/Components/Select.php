@@ -623,9 +623,26 @@ class Select extends Field implements Contracts\HasNestedRecursiveValidationRule
             static fn (Select $component): bool => ! $component->isMultiple(),
         );
 
-        $this->saveRelationshipsUsing(static function (Select $component, Model $record, $state) {
+       $this->saveRelationshipsUsing(static function (Select $component, Model $record, $state) {
             if ($component->isMultiple()) {
-                $component->getRelationship()->sync($state ?? []);
+
+                if ($component->getRelationship() instanceof MorphToMany) {
+                    $currentRelationshipName = $component->getRelationshipName();
+                    $table = $component->getRelationship()->getTable();
+                    $morphType = $component->getRelationship()->getMorphType();
+                    $morphClass = $component->getRelationship()->getMorphClass();
+                    $foreignPivotKey = $component->getRelationship()->getForeignPivotKeyName();
+                    $relatedPivotKey = $component->getRelationship()->getRelatedPivotKeyName();
+                    foreach ($record->$currentRelationshipName as $category) {
+                        DB::table($table)->where($morphType, '=', $morphClass)->where($foreignPivotKey, $record->id)->where($relatedPivotKey, $category->id)->delete();
+                    }
+                    foreach ($state as $sta) {
+                        $component->getRelationship()->attach($sta);
+                    }
+                } else {
+                    $component->getRelationship()->sync($state ?? []);
+                }
+
 
                 return;
             }
